@@ -12,7 +12,6 @@ def index_by_id(records: List[ConvFinQARecord]) -> Dict[str, ConvFinQARecord]:
     return {r.id: r for r in records}
 
 def get_turn_question(record: ConvFinQARecord, turn: Optional[int]) -> str:
-    # default to the last turn if not specified
     if not record.dialogue.conv_questions:
         return ""
     if turn is None or turn < 0 or turn >= len(record.dialogue.conv_questions):

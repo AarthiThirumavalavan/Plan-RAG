@@ -2,10 +2,6 @@ from __future__ import annotations
 from typing import Dict, List, Union
 from pydantic import BaseModel, Field
 
-# Mirrors the dataset card's definitions
-# (ConvFinQARecord, Document, Dialogue, Features)
-# so parsing is robust to the cleaned structure.  :contentReference[oaicite:1]{index=1}
-
 Number = Union[float, int, str]
 
 class Document(BaseModel):
