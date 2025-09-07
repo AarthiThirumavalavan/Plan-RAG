@@ -1,25 +1,29 @@
+#!/usr/bin/env python3
 from __future__ import annotations
+
 import os
+from typing import Optional
+
 import typer
 from rich import print as rprint
 from rich.table import Table
-from typing import Optional
 
 from .dataset import load_records, index_by_id, get_turn_question, get_turn_gold
 from .retrieval import PerDocRetriever
 from .executor import PlanRAGRunner
 from .metrics import numeric_match
 
-# CLI app (script entrypoint is configured as "main = src.main:app")  :contentReference[oaicite:2]{index=2}
-# Usage follows your README's pattern: uv run main chat <record_id>  :contentReference[oaicite:3]{index=3}
 app = typer.Typer(help="Plan*RAG Conversational QA over ConvFinQA")
 
+
 def _load(data_path: str):
+    """Load dataset and return an id->record index."""
     if not os.path.exists(data_path):
         rprint(f"[red]Dataset not found at {data_path}[/red]")
         raise typer.Exit(code=2)
     records = load_records(data_path)
     return index_by_id(records)
+
 
 @app.command()
 def chat(
@@ -48,7 +52,8 @@ def chat(
 
     # Pretty print plan answers
     t = Table(title="Plan*RAG sub-answers")
-    t.add_column("Node"); t.add_column("Answer")
+    t.add_column("Node")
+    t.add_column("Answer")
     for k, v in sorted(answers.items()):
         t.add_row(k, str(v))
     rprint(t)
@@ -66,6 +71,7 @@ def chat(
     if gold is not None:
         ok = numeric_match(final, str(gold))
         rprint(f"[bold]Gold:[/bold] {gold}    Match: {'✅' if ok else '❌'}")
+
 
 @app.command()
 def eval(
@@ -94,7 +100,43 @@ def eval(
         raise typer.Exit(code=1)
     rprint(f"[bold]Numeric@1[/bold]: {hits}/{total} = {hits/total:.2%}")
 
+
+@app.command()
+def repl(
+    record_id: str = typer.Argument(..., help="Record ID from the dataset"),
+    data: str = typer.Option("convfinqa_dataset.json", help="Path to convfinqa_dataset.json"),
+):
+    """Simple interactive loop to ask multiple questions against the same record."""
+    idx = _load(data)
+    if record_id not in idx:
+        rprint(f"[red]Unknown record_id: {record_id}[/red]")
+        raise typer.Exit(code=2)
+
+    rec = idx[record_id]
+    rprint(f"[bold]Loaded record:[/bold] {record_id}")
+    retriever = PerDocRetriever(rec)
+    runner = PlanRAGRunner(retriever)
+
+    while True:
+        try:
+            q = input("you> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            break
+        if q.lower() in {"exit", "quit"}:
+            break
+        if not q:
+            continue
+
+        final, answers, _ = runner.run(q)
+        print("bot>", final)
+
+
 @app.command()
 def report_template():
     """Print where to write your findings (REPORT.md)."""
-    rprint("Fill in your findings in REPORT.md (template is already in the repo).")  # :contentReference[oaicite:4]{index=4}
+    rprint("Fill in your findings in REPORT.md (template is already in the repo).")
+
+
+if __name__ == "__main__":
+    app()
